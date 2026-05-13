@@ -1,201 +1,162 @@
+"""Simple LEGO CSAI hardware test runner.
+
+Set the boolean flags below to choose which devices to connect.
+The script connects only the selected hardware and runs the matching test.
 """
-LEGO Bluetooth Low Energy (BLE) Controller
 
-This module communicates with LEGO Bluetooth devices and sends
-commands to an Arduino via serial port.
-"""
+import time
 
-import asyncio
-import serial
-import logging
-from typing import Optional
-from bleak import BleakClient, BleakScanner
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+import legoeducation as le
 
 
-class LEGOBLEController:
-    """Controller for LEGO BLE devices with Arduino serial communication."""
+CARD_COLOR = le.LEGO_COLOR_AZURE
+CARD_SERIAL = "3683"
+TEST_DURATION_SECONDS = 5
 
-    def __init__(self, serial_port: str = "COM3", baud_rate: int = 9600):
-        """
-        Initialize the LEGO BLE Controller.
+# Change these booleans to match the hardware you want to test.
+CONNECT_SINGLE_MOTOR = True
+CONNECT_COLOR_SENSOR = False
+CONNECT_DOUBLE_MOTOR = False
+CONNECT_CONTROLLER = False
 
-        Args:
-            serial_port: Serial port for Arduino communication (e.g., 'COM3' or '/dev/ttyUSB0')
-            baud_rate: Baud rate for serial communication (default: 9600)
-        """
-        self.serial_port = serial_port
-        self.baud_rate = baud_rate
-        self.arduino_connection: Optional[serial.Serial] = None
-        self.ble_client: Optional[BleakClient] = None
-        self.lego_device_address: Optional[str] = None
 
-    def connect_arduino(self) -> bool:
-        """
-        Connect to the Arduino via serial port.
+def create_selected_devices():
+    """Create only the devices enabled by the boolean flags."""
+    devices = {
+        "single_motor": None,
+        "color_sensor": None,
+        "double_motor": None,
+        "controller": None,
+    }
 
-        Returns:
-            True if connection successful, False otherwise
-        """
-        try:
-            self.arduino_connection = serial.Serial(
-                port=self.serial_port,
-                baudrate=self.baud_rate,
-                timeout=1
-            )
-            logger.info(f"Connected to Arduino on {self.serial_port}")
-            return True
-        except serial.SerialException as e:
-            logger.error(f"Failed to connect to Arduino: {e}")
+    if CONNECT_SINGLE_MOTOR:
+        devices["single_motor"] = le.SingleMotor()
+    if CONNECT_COLOR_SENSOR:
+        devices["color_sensor"] = le.ColorSensor()
+    if CONNECT_DOUBLE_MOTOR:
+        devices["double_motor"] = le.DoubleMotor()
+    if CONNECT_CONTROLLER:
+        devices["controller"] = le.Controller()
+
+    return devices
+
+
+def selected_device_list(devices):
+    """Return a simple list of device names and device objects."""
+    selected = []
+
+    if devices["single_motor"] is not None:
+        selected.append(("Single Motor", devices["single_motor"]))
+    if devices["color_sensor"] is not None:
+        selected.append(("Color Sensor", devices["color_sensor"]))
+    if devices["double_motor"] is not None:
+        selected.append(("Double Motor", devices["double_motor"]))
+    if devices["controller"] is not None:
+        selected.append(("Controller", devices["controller"]))
+
+    return selected
+
+
+def connect_selected_devices(devices):
+    """Connect all selected devices."""
+    for label, device in selected_device_list(devices):
+        print(f"Connecting {label}...")
+        device.connect(card_color=CARD_COLOR, card_serial=CARD_SERIAL)
+        if not getattr(device, "connected", False):
+            print(f"Error connecting to {label}.")
             return False
+        print(f"Connected {label}.")
 
-    def disconnect_arduino(self) -> None:
-        """Disconnect from the Arduino."""
-        if self.arduino_connection and self.arduino_connection.is_open:
-            self.arduino_connection.close()
-            logger.info("Disconnected from Arduino")
+    return True
 
-    async def scan_lego_devices(self, timeout: float = 5.0) -> list[str]:
-        """
-        Scan for available LEGO Bluetooth devices.
 
-        Args:
-            timeout: Scan timeout in seconds
-
-        Returns:
-            List of discovered LEGO device addresses
-        """
-        logger.info(f"Scanning for LEGO devices (timeout: {timeout}s)")
-        devices = []
-        scanner = BleakScanner()
-        discovered = await scanner.discover(timeout=timeout)
-
-        for device in discovered:
-            if device.name and "LEGO" in device.name.upper():
-                devices.append(device.address)
-                logger.info(f"Found LEGO device: {device.name} ({device.address})")
-
-        return devices
-
-    async def connect_lego_device(self, device_address: str) -> bool:
-        """
-        Connect to a LEGO BLE device.
-
-        Args:
-            device_address: Bluetooth address of the LEGO device
-
-        Returns:
-            True if connection successful, False otherwise
-        """
+def disconnect_selected_devices(devices):
+    """Disconnect all selected devices."""
+    for label, device in selected_device_list(devices):
         try:
-            self.ble_client = BleakClient(device_address)
-            await self.ble_client.connect()
-            self.lego_device_address = device_address
-            logger.info(f"Connected to LEGO device: {device_address}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to connect to LEGO device: {e}")
-            return False
-
-    async def disconnect_lego_device(self) -> None:
-        """Disconnect from the LEGO BLE device."""
-        if self.ble_client and self.ble_client.is_connected:
-            await self.ble_client.disconnect()
-            logger.info("Disconnected from LEGO device")
-
-    def send_to_arduino(self, command: str) -> bool:
-        """
-        Send a command to the Arduino via serial.
-
-        Args:
-            command: Command string to send to Arduino
-
-        Returns:
-            True if sent successfully, False otherwise
-        """
-        if not self.arduino_connection or not self.arduino_connection.is_open:
-            logger.error("Arduino not connected")
-            return False
-
-        try:
-            self.arduino_connection.write(command.encode() + b'\n')
-            logger.info(f"Sent to Arduino: {command}")
-            return True
-        except serial.SerialException as e:
-            logger.error(f"Failed to send to Arduino: {e}")
-            return False
-
-    def read_from_arduino(self, timeout: float = 1.0) -> Optional[str]:
-        """
-        Read a response from the Arduino via serial.
-
-        Args:
-            timeout: Read timeout in seconds
-
-        Returns:
-            Response string or None if no data received
-        """
-        if not self.arduino_connection or not self.arduino_connection.is_open:
-            return None
-
-        try:
-            if self.arduino_connection.in_waiting > 0:
-                response = self.arduino_connection.readline().decode().strip()
-                logger.info(f"Received from Arduino: {response}")
-                return response
-        except serial.SerialException as e:
-            logger.error(f"Failed to read from Arduino: {e}")
-
-        return None
-
-    async def run(self, device_address: Optional[str] = None) -> None:
-        """
-        Main run loop for the controller.
-
-        Args:
-            device_address: Optional LEGO device address. If not provided, scans for devices.
-        """
-        # Connect to Arduino
-        if not self.connect_arduino():
-            return
-
-        try:
-            # Connect to LEGO device
-            if not device_address:
-                devices = await self.scan_lego_devices()
-                if not devices:
-                    logger.error("No LEGO devices found")
-                    return
-                device_address = devices[0]
-
-            if not await self.connect_lego_device(device_address):
-                return
-
-            logger.info("System ready. Type commands (or 'quit' to exit)")
-            
-            # Main command loop
-            while True:
-                try:
-                    # In a real application, you would read from LEGO device here
-                    # and forward data to Arduino as needed
-                    await asyncio.sleep(0.1)
-
-                except KeyboardInterrupt:
-                    break
-
-        finally:
-            await self.disconnect_lego_device()
-            self.disconnect_arduino()
-            logger.info("Shutdown complete")
+            if getattr(device, "connected", False):
+                print(f"Disconnecting {label}...")
+                device.disconnect()
+        except Exception as error:
+            print(f"Disconnect failed for {label}: {error}")
 
 
-async def main():
-    """Main entry point."""
-    controller = LEGOBLEController(serial_port="COM3")
-    await controller.run()
+def run_single_motor_test(single_motor):
+    """Move the single motor by 180 degrees."""
+    print("Running single motor test: move 180 degrees.")
+    single_motor.motor_run_for_degrees(180)
+    print("Single motor test complete.")
+
+
+def run_color_sensor_test(single_motor, color_sensor):
+    """Use the color sensor to choose a motor speed."""
+    print("Running color sensor test for five seconds: green=fast, red=slow.")
+
+    for _ in range(TEST_DURATION_SECONDS * 10):
+        detected_color = color_sensor.sensor.color
+
+        if detected_color == le.LEGO_COLOR_GREEN:
+            single_motor.motor_run(speed=80)
+        elif detected_color == le.LEGO_COLOR_RED:
+            single_motor.motor_run(speed=10)
+        else:
+            single_motor.motor_stop()
+
+        time.sleep(0.1)
+
+    single_motor.motor_stop()
+    print("Color sensor test complete.")
+
+
+def run_controller_test(double_motor, controller):
+    """Use the handheld controller to drive the double motor."""
+    print("Running controller test for five seconds: levers drive tank movement.")
+
+    for _ in range(TEST_DURATION_SECONDS * 10):
+        speed_left = controller.sensor.leftPercent
+        speed_right = controller.sensor.rightPercent
+        double_motor.movement_move_tank(
+            speed_left=speed_left,
+            speed_right=speed_right,
+        )
+        time.sleep(0.1)
+
+    print("Controller test complete.")
+
+
+def run_selected_tests(devices):
+    """Run the test that matches the currently selected devices."""
+    single_motor = devices["single_motor"]
+    color_sensor = devices["color_sensor"]
+    double_motor = devices["double_motor"]
+    controller = devices["controller"]
+
+    if single_motor is not None and color_sensor is None:
+        run_single_motor_test(single_motor)
+
+    if single_motor is not None and color_sensor is not None:
+        run_color_sensor_test(single_motor, color_sensor)
+
+    if double_motor is not None and controller is not None:
+        run_controller_test(double_motor, controller)
+
+    if not any((single_motor, color_sensor, double_motor, controller)):
+        print("No devices selected. Set one or more booleans near the top of the file.")
+
+
+def main():
+    devices = create_selected_devices()
+
+    if not connect_selected_devices(devices):
+        disconnect_selected_devices(devices)
+        return 1
+
+    try:
+        run_selected_tests(devices)
+        return 0
+    finally:
+        disconnect_selected_devices(devices)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    raise SystemExit(main())
