@@ -7,156 +7,128 @@ The script connects only the selected hardware and runs the matching test.
 import time
 
 import legoeducation as le
+import serial
 
 
-CARD_COLOR = le.LEGO_COLOR_AZURE
-CARD_SERIAL = "3683"
+CARD_COLOUR = le.LEGO_COLOR_RED
+CARD_SERIAL = '0943'
 TEST_DURATION_SECONDS = 5
+SERIAL_PORT = 'COM7'
+SERIAL_BAUDRATE = 9600
+SERIAL_TIMEOUT_SECONDS = 1
 
 # Change these booleans to match the hardware you want to test.
-CONNECT_SINGLE_MOTOR = True
+CONNECT_SINGLE_MOTOR = False
 CONNECT_COLOR_SENSOR = False
-CONNECT_DOUBLE_MOTOR = False
-CONNECT_CONTROLLER = False
+CONNECT_DOUBLE_MOTOR = True
+CONNECT_CONTROLLER = True
 
 
-def create_selected_devices():
-    """Create only the devices enabled by the boolean flags."""
-    devices = {
-        "single_motor": None,
-        "color_sensor": None,
-        "double_motor": None,
-        "controller": None,
-    }
+"""Connect to devices that are 'True' flags."""
+print("Connecting to devices. Please wait...")
 
-    if CONNECT_SINGLE_MOTOR:
-        devices["single_motor"] = le.SingleMotor()
-    if CONNECT_COLOR_SENSOR:
-        devices["color_sensor"] = le.ColorSensor()
-    if CONNECT_DOUBLE_MOTOR:
-        devices["double_motor"] = le.DoubleMotor()
-    if CONNECT_CONTROLLER:
-        devices["controller"] = le.Controller()
+if CONNECT_SINGLE_MOTOR:
+    single_motor = le.SingleMotor()
+    single_motor.connect(card_color=CARD_COLOUR, card_serial=CARD_SERIAL)
+    if not single_motor.connected:
+        print('Error connecting to Single Motor.')
+        exit(1) # error connecting
+    print(f"Connected Single Motor")
 
-    return devices
+if CONNECT_COLOR_SENSOR:
+    colour_sensor = le.ColorSensor()
+    colour_sensor.connect(card_color=CARD_COLOUR, card_serial=CARD_SERIAL)
+    if not colour_sensor.connected:
+        print('Error connecting to Colour Sensor.')
+        exit(1) # error connecting
+    print(f"Connected Colour Sensor")
 
+if CONNECT_DOUBLE_MOTOR:
+    double_motor = le.DoubleMotor()
+    double_motor.connect(card_color=CARD_COLOUR, card_serial=CARD_SERIAL)
+    if not double_motor.connected:
+        print('Error connecting to Double Motor.')
+        exit(1) # error connecting
+    print(f"Connected Double Motor")
 
-def selected_device_list(devices):
-    """Return a simple list of device names and device objects."""
-    selected = []
+if CONNECT_CONTROLLER:
+    controller = le.Controller()
+    controller.connect(card_color=CARD_COLOUR, card_serial=CARD_SERIAL)
+    if not controller.connected:
+        print('Error connecting to Controller.')
+        exit(1) # error connecting
+    print(f"Connected Controller")
 
-    if devices["single_motor"] is not None:
-        selected.append(("Single Motor", devices["single_motor"]))
-    if devices["color_sensor"] is not None:
-        selected.append(("Color Sensor", devices["color_sensor"]))
-    if devices["double_motor"] is not None:
-        selected.append(("Double Motor", devices["double_motor"]))
-    if devices["controller"] is not None:
-        selected.append(("Controller", devices["controller"]))
+try:
+    arduino_serial = serial.Serial(
+        port=SERIAL_PORT,
+        baudrate=SERIAL_BAUDRATE,
+        timeout=SERIAL_TIMEOUT_SECONDS,
+    )
+except serial.SerialException as error:
+    print(f"Error opening serial port {SERIAL_PORT}: {error}")
+    exit(1)
 
-    return selected
-
-
-def connect_selected_devices(devices):
-    """Connect all selected devices."""
-    for label, device in selected_device_list(devices):
-        print(f"Connecting {label}...")
-        device.connect(card_color=CARD_COLOR, card_serial=CARD_SERIAL)
-        if not getattr(device, "connected", False):
-            print(f"Error connecting to {label}.")
-            return False
-        print(f"Connected {label}.")
-
-    return True
+print(f"Serial connected on {SERIAL_PORT} at {SERIAL_BAUDRATE} baud.")
 
 
-def disconnect_selected_devices(devices):
-    """Disconnect all selected devices."""
-    for label, device in selected_device_list(devices):
-        try:
-            if getattr(device, "connected", False):
-                print(f"Disconnecting {label}...")
-                device.disconnect()
-        except Exception as error:
-            print(f"Disconnect failed for {label}: {error}")
+"""Run tests for the connected devices."""
+print("Starting tests for connected devices.")
 
+try:
+    if CONNECT_SINGLE_MOTOR and not CONNECT_COLOR_SENSOR:
+        """Move the single motor by 180 degrees."""
+        print("Running single motor test: move 180 degrees.")
+        single_motor.motor_run_for_degrees(180)
+        print("Single motor test complete.")
 
-def run_single_motor_test(single_motor):
-    """Move the single motor by 180 degrees."""
-    print("Running single motor test: move 180 degrees.")
-    single_motor.motor_run_for_degrees(180)
-    print("Single motor test complete.")
+    if CONNECT_SINGLE_MOTOR and CONNECT_COLOR_SENSOR:
+        """Use the color sensor to choose a motor speed."""
+        print("Running color sensor test for five seconds: green=fast, red=slow.")
 
+        for _ in range(TEST_DURATION_SECONDS * 10):
+            detected_colour = colour_sensor.sensor.color
 
-def run_color_sensor_test(single_motor, color_sensor):
-    """Use the color sensor to choose a motor speed."""
-    print("Running color sensor test for five seconds: green=fast, red=slow.")
+            if detected_colour == le.LEGO_COLOR_GREEN:
+                single_motor.motor_run(speed=80)
+            elif detected_colour == le.LEGO_COLOR_RED:
+                single_motor.motor_run(speed=10)
+            else:
+                single_motor.motor_stop()
 
-    for _ in range(TEST_DURATION_SECONDS * 10):
-        detected_color = color_sensor.sensor.color
+            time.sleep(0.1)
 
-        if detected_color == le.LEGO_COLOR_GREEN:
-            single_motor.motor_run(speed=80)
-        elif detected_color == le.LEGO_COLOR_RED:
-            single_motor.motor_run(speed=10)
-        else:
-            single_motor.motor_stop()
+        single_motor.motor_stop()
+        print("Colour sensor test complete.")
 
-        time.sleep(0.1)
+    if CONNECT_DOUBLE_MOTOR and CONNECT_CONTROLLER:
+        """Use the handheld controller to drive the double motor."""
+        print("Running controller test for ten seconds: levers drive tank movement.")
 
-    single_motor.motor_stop()
-    print("Color sensor test complete.")
+        for i in range(TEST_DURATION_SECONDS * 10):
+            if arduino_serial.in_waiting > 0:
+                incoming_message = arduino_serial.readline().decode("ascii", errors="ignore").strip()
+                if incoming_message:
+                    print(f"Arduino serial received: {incoming_message}")
 
+                if "B1" in incoming_message.upper():
+                    print("Received B1 from Arduino. Running 360 degree spin.")
+                    double_motor.movement_move_for_degrees(360)
+                    continue
 
-def run_controller_test(double_motor, controller):
-    """Use the handheld controller to drive the double motor."""
-    print("Running controller test for five seconds: levers drive tank movement.")
+            speed_left = controller.sensor.leftPercent
+            speed_right = controller.sensor.rightPercent
+            double_motor.movement_move_tank(
+                speed_left=speed_left,
+                speed_right=speed_right,
+            )
 
-    for _ in range(TEST_DURATION_SECONDS * 10):
-        speed_left = controller.sensor.leftPercent
-        speed_right = controller.sensor.rightPercent
-        double_motor.movement_move_tank(
-            speed_left=speed_left,
-            speed_right=speed_right,
-        )
-        time.sleep(0.1)
+            # Send as CSV: leftPercent,rightPercent\n
+            arduino_serial.write(f"{speed_left},{speed_right}\n".encode("ascii"))
+            """print(f"{speed_left},{speed_right}\n")"""
+            time.sleep(0.1)
 
-    print("Controller test complete.")
+        print("Controller test complete.")
+finally:
+    arduino_serial.close()
 
-
-def run_selected_tests(devices):
-    """Run the test that matches the currently selected devices."""
-    single_motor = devices["single_motor"]
-    color_sensor = devices["color_sensor"]
-    double_motor = devices["double_motor"]
-    controller = devices["controller"]
-
-    if single_motor is not None and color_sensor is None:
-        run_single_motor_test(single_motor)
-
-    if single_motor is not None and color_sensor is not None:
-        run_color_sensor_test(single_motor, color_sensor)
-
-    if double_motor is not None and controller is not None:
-        run_controller_test(double_motor, controller)
-
-    if not any((single_motor, color_sensor, double_motor, controller)):
-        print("No devices selected. Set one or more booleans near the top of the file.")
-
-
-def main():
-    devices = create_selected_devices()
-
-    if not connect_selected_devices(devices):
-        disconnect_selected_devices(devices)
-        return 1
-
-    try:
-        run_selected_tests(devices)
-        return 0
-    finally:
-        disconnect_selected_devices(devices)
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
