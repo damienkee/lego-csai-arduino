@@ -13,6 +13,7 @@
 #define LEFT_PIXEL_PIN 4
 #define RIGHT_PIXEL_PIN 5
 #define PIXEL_COUNT 13
+#define PIXEL_BRIGHTNESS 40
 #define INPUT_BUFFER_SIZE 48
 #define TELEMETRY_INTERVAL_MS 50
 
@@ -92,6 +93,8 @@ void setup() {
 
   leftStrip.begin();
   rightStrip.begin();
+  leftStrip.setBrightness(PIXEL_BRIGHTNESS);
+  rightStrip.setBrightness(PIXEL_BRIGHTNESS);
   leftStrip.show();
   rightStrip.show();
 
