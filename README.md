@@ -1,23 +1,27 @@
 # LEGO BLE Arduino Controller
 
-A Python/Arduino project for controlling LEGO Bluetooth devices through serial communication.
+A LEGO Education / Arduino project for bridging LE-BT devices and commonly available Arduino peripherals.
 
 ## Overview
 
 This project consists of two main components:
 
-1. **Python Application** (`lego_ble_controller.py`): Communicates with LEGO Bluetooth Low Energy (BLE) devices and sends commands to an Arduino microcontroller via serial port.
+1. **Python Script** (`lego_ble_controller.py`): 
+Collects data from LE Controller and sneds it on the serial port
+Parses data from the Arduino (via Serial port) to control a Double Motor
 
-2. **Arduino Sketch** (`arduino_sketch/lego_controller.ino`): Receives commands from the Python application and controls LEGO motors/devices accordingly.
+2. **Arduino Sketch** (`arduino_sketch/lego_controller.ino`): 
+Receives serial stream of Controller stick positions to control a pair of NeoPixels.
+Reads in the state of a button and Potentiometer and sends via serial port
 
 ## Hardware Requirements
 
 - Arduino Uno (or compatible board)
+- Neopixels, buttons, potentiometer
 - USB cable for Arduino programming and power
-- LEGO device with Bluetooth support
-- PC or Raspberry Pi running Python
+- LEGO Education Controller from CSAI kit
+- LEGO Education Double Motor from CSAI kit
 
-## Software Requirements
 
 ### Python Dependencies
 
@@ -30,28 +34,6 @@ This project consists of two main components:
 - Arduino IDE
 - Arduino Uno board package
 
-## Installation
-
-### Python Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/lego-csai-arduino.git
-cd lego-csai-arduino
-
-# Install Python dependencies
-pip install -r requirements.txt
-```
-
-### Arduino Setup
-
-1. Open Arduino IDE
-2. Open the sketch: `arduino_sketch/lego_controller.ino`
-3. Select Board: Arduino Uno
-4. Select Port: (your Arduino's COM port)
-5. Click Upload
-
-## Usage
 
 ### Starting the Python Application
 
@@ -60,44 +42,11 @@ python lego_ble_controller.py
 ```
 
 ### Serial Communication Protocol
+Python script sends leftPercent (-100 -> 100), righPercent, /n as gathered from the LE Controller
+Arduino sends potentiometer analog reading (0->1024), button state (1/0) gathered from peripherals
 
-The Arduino accepts commands via serial (9600 baud):
 
-- `MOTOR_A:150` - Set motor A to speed 150 (0-255)
-- `MOTOR_B:255` - Set motor B to full speed
-- `MOTOR_C:100` - Set motor C to speed 100
-- `STOP` - Stop all motors
-- `STATUS` - Get current motor status
-
-## Architecture
-
-```
-Python Application
-    ↓ (BLE)
-LEGO Device
-    ↑ (commands)
-    ↓ (serial)
-Arduino Uno
-    ↓ (PWM)
-LEGO Motors
-```
-
-## Project Structure
-
-```
-lego-csai-arduino/
-├── lego_ble_controller.py     # Main Python BLE controller
-├── arduino_sketch/
-│   └── lego_controller.ino    # Arduino sketch
-├── requirements.txt           # Python dependencies
-├── README.md                  # This file
-└── .gitignore                # Git ignore rules
-```
-
-## License
-
-MIT License
 
 ## Author
 
-Created May 2026
+Created May 2026 - Damien Kee
