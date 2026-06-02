@@ -2,6 +2,10 @@
 
 A LEGO Education / Arduino project for bridging LE-BT devices and commonly available Arduino peripherals.
 
+--Disclaimer--
+I used Co-pilot to help with the Python Serial side of things as I haven't had much experience with that.  Please don't judge me.
+
+
 ## Overview
 
 This project consists of two main components:
