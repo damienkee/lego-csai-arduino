@@ -42,8 +42,9 @@ python lego_ble_controller.py
 ```
 
 ### Serial Communication Protocol
-Python script sends leftPercent (-100 -> 100), righPercent, /n as gathered from the LE Controller
-Arduino sends potentiometer analog reading (0->1024), button state (1/0) gathered from peripherals
+Python script sends "leftPercent (-100 -> 100), righPercent, /n" as gathered from the LE Controller
+
+Arduino sends "potentiometer analog reading (0->1024), button state (1/0)" gathered from peripherals
 
 
 
