@@ -7,6 +7,8 @@ https://github.com/LEGO/LEGOEducation/tree/main
 --Disclaimer--
 I used Co-pilot to help with the Python Serial side of things as I haven't had much experience with that.  Please don't judge me.
 
+https://youtu.be/355dFFHHvV8
+
 
 ## Overview
 
