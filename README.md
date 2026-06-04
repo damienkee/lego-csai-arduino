@@ -1,6 +1,8 @@
 # LEGO BLE Arduino Controller
 
 A LEGO Education / Arduino project for bridging LE-BT devices and commonly available Arduino peripherals.
+I leaned heavily on the LEGO Education Python API which can be found here
+https://github.com/LEGO/LEGOEducation/tree/main
 
 --Disclaimer--
 I used Co-pilot to help with the Python Serial side of things as I haven't had much experience with that.  Please don't judge me.
